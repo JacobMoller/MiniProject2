@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package chat;
+option go_package = "https://github.com/JacobMoller/MiniProject2;protobuf";
+
+service ChittyChat {
+    rpc Publish (PublishRequest) returns (PublishReply) {}
+    rpc PublishTwo (PublishRequest) returns (PublishReply) {}
+    //rpc Broadcast (BroadcastRequest) returns (BroadcastReply) {}
+}
+
+message PublishRequest {
+    string time = 1;
+    string type = 2;
+    string message = 3;
+    string from = 4;
+}
+
+message PublishReply {
+    string message = 1;
+}
+
+/*message Client {
+    string Name = 1;
+}*/
+
+/*
+message BroadcastRequest {
+    string time = 1;
+    string message = 2;
+}
+*/
+
+
+/*
+    string from = 1;
+    enum MessageType {
+        CHAT = 0;
+        JOIN = 1;
+        LEAVE = 2;
+    }
+    MessageType type = 2;
+    string content = 3;
+*/
