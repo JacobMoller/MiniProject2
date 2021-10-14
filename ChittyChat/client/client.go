@@ -3,14 +3,20 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"Miniproject2/ChittyChat/protobuf"
 
 	"google.golang.org/grpc"
 )
+
+//var int latestTimestamp
+
+var possibleResponses = []string{"hej", "dav", "dejligt vejr", "godnat"}
 
 func main() {
 	log.Print("Welcome to ChittyChat. Please enter a username:")
@@ -26,16 +32,21 @@ func main() {
 
 	client := protobuf.NewChittyChatClient(conn)
 
-	response, err := client.Publish(context.Background(), &protobuf.PublishRequest{Time: "nu", Type: "JOIN", Message: "JOIN MSG", From: name})
-	if err != nil {
-		log.Fatalf("could not get chat list: %v", err)
-	}
+	client.Publish(context.Background(), &protobuf.PublishRequest{Time: "nu", Type: "JOIN", Message: "JOIN MSG", From: name})
 
-	response2, err2 := client.Publish(context.Background(), &protobuf.PublishRequest{Time: "nu", Type: "CHAT", Message: "Japan!", From: name})
-	if err2 != nil {
-		log.Fatalf("could not get chat list: %v", err)
+	for {
+		response3, err2 := client.Broadcast(context.Background(), &protobuf.BroadcastRequest{LatestMessageTimestamp: "hewwo"})
+		if err2 != nil {
+			log.Fatalf("could not get chat list: %v", err)
+		}
+		for i := 0; i < len(response3.Activities); i++ {
+			log.Print(response3.Activities[i])
+			//if response3.Activities[i].Time > latestTimestamp {
+			//update the latest timestamp
+			//}
+		}
+		fmt.Println("listening again")
+		time.Sleep(time.Second)
+		//wait x seconds
 	}
-
-	log.Print(response.GetMessage())
-	log.Print(response2.GetMessage())
 }

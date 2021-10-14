@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ChittyChatClient interface {
 	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishReply, error)
 	PublishTwo(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishReply, error)
+	Broadcast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*BroadcastReply, error)
 }
 
 type chittyChatClient struct {
@@ -48,12 +49,22 @@ func (c *chittyChatClient) PublishTwo(ctx context.Context, in *PublishRequest, o
 	return out, nil
 }
 
+func (c *chittyChatClient) Broadcast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*BroadcastReply, error) {
+	out := new(BroadcastReply)
+	err := c.cc.Invoke(ctx, "/chat.ChittyChat/Broadcast", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChittyChatServer is the server API for ChittyChat service.
 // All implementations must embed UnimplementedChittyChatServer
 // for forward compatibility
 type ChittyChatServer interface {
 	Publish(context.Context, *PublishRequest) (*PublishReply, error)
 	PublishTwo(context.Context, *PublishRequest) (*PublishReply, error)
+	Broadcast(context.Context, *BroadcastRequest) (*BroadcastReply, error)
 	mustEmbedUnimplementedChittyChatServer()
 }
 
@@ -66,6 +77,9 @@ func (UnimplementedChittyChatServer) Publish(context.Context, *PublishRequest) (
 }
 func (UnimplementedChittyChatServer) PublishTwo(context.Context, *PublishRequest) (*PublishReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishTwo not implemented")
+}
+func (UnimplementedChittyChatServer) Broadcast(context.Context, *BroadcastRequest) (*BroadcastReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
 func (UnimplementedChittyChatServer) mustEmbedUnimplementedChittyChatServer() {}
 
@@ -116,6 +130,24 @@ func _ChittyChat_PublishTwo_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChittyChat_Broadcast_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BroadcastRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChittyChatServer).Broadcast(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/chat.ChittyChat/Broadcast",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChittyChatServer).Broadcast(ctx, req.(*BroadcastRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChittyChat_ServiceDesc is the grpc.ServiceDesc for ChittyChat service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -130,6 +162,10 @@ var ChittyChat_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PublishTwo",
 			Handler:    _ChittyChat_PublishTwo_Handler,
+		},
+		{
+			MethodName: "Broadcast",
+			Handler:    _ChittyChat_Broadcast_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

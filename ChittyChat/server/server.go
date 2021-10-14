@@ -10,6 +10,16 @@ import (
 	"google.golang.org/grpc"
 )
 
+var activityDB []Activity
+
+type Activity struct {
+	Time    string
+	Type    string
+	Message string
+	From    string
+	New     bool
+}
+
 type server struct {
 	protobuf.UnimplementedChittyChatServer
 }
@@ -20,25 +30,27 @@ type Message struct {
 }
 
 func (s *server) Publish(ctx context.Context, in *protobuf.PublishRequest) (*protobuf.PublishReply, error) {
-	if in.Type == "JOIN" {
-		return &protobuf.PublishReply{Message: "Participant " + in.From + " joined Chitty-Chat at Lamport time L"}, nil
-	} else {
-		return &protobuf.PublishReply{Message: in.From + ": " + in.Message}, nil
-	}
-	//implement actual logic of getting the courses
-	//.HelloReply{Message: fmt.Sprint(courses[num].Name) + ";" + fmt.Sprint(courses[num].StudentSatisfactionRating)}, nil
+	activityDB = append(activityDB, Activity{in.Time, in.Type, in.Message, in.From, true})
+	return &protobuf.PublishReply{}, nil
 }
 
-/*func (s *server) Broadcast(ctx context.Context) (*protobuf.GetCourseListReply, error) {
-	//implement actual logic of getting the courses
-
-	var listOfChatMessages = []*protobuf.Course{
-		{From: "Jacob", Type: "message", Content: "Hej verden!"},
-		{From: "Jeppe", Type: "message", Content: "Yo!"},
-		{From: "Freja", Type: "message", Content: "Japan!"},
+func (s *server) Broadcast(ctx context.Context, in *protobuf.BroadcastRequest) (*protobuf.BroadcastReply, error) {
+	var newActivities []*protobuf.Activity
+	for i := 0; i < len(activityDB); i++ {
+		activity := activityDB[i]
+		activityForProtobuf := &protobuf.Activity{
+			Time:    activity.Time,
+			Type:    activity.Type,
+			Message: activity.Message,
+			From:    activity.From,
+		}
+		if activity.New {
+			activityDB[i].New = false
+			newActivities = append(newActivities, activityForProtobuf)
+		}
 	}
-	return &protobuf.broadcastReply{listOfChatMessages}, nil //.HelloReply{Message: fmt.Sprint(courses[num].Name) + ";" + fmt.Sprint(courses[num].StudentSatisfactionRating)}, nil
-}*/
+	return &protobuf.BroadcastReply{Activities: newActivities}, nil
+}
 
 func main() {
 	//port :8080
