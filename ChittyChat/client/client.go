@@ -16,7 +16,8 @@ import (
 
 //var int latestTimestamp
 
-var possibleResponses = []string{"hej", "dav", "dejligt vejr", "godnat"}
+var latestMessageId = int32(0)
+var lamport = int32(0)
 
 func main() {
 	log.Print("Welcome to ChittyChat. Please enter a username:")
@@ -32,21 +33,46 @@ func main() {
 
 	client := protobuf.NewChittyChatClient(conn)
 
-	client.Publish(context.Background(), &protobuf.PublishRequest{Time: "nu", Type: "JOIN", Message: "JOIN MSG", From: name})
+	//Publish Join
+	lamport++
+	client.Publish(context.Background(), &protobuf.PublishRequest{Time: lamport, Type: "JOIN", Message: "JOIN MSG", From: name})
 
+	go collectNewActivities(client, name)
+	go enterToChat(client, name)
+	time.Sleep(1000 * time.Second)
+}
+
+func enterToChat(client protobuf.ChittyChatClient, name string) {
 	for {
-		response3, err2 := client.Broadcast(context.Background(), &protobuf.BroadcastRequest{LatestMessageTimestamp: "hewwo"})
-		if err2 != nil {
+		reader := bufio.NewReader(os.Stdin)
+		text, _ := reader.ReadString('\n')
+		//Publish chat msg
+		lamport++
+		client.Publish(context.Background(), &protobuf.PublishRequest{Time: lamport, Type: "CHAT", Message: text, From: name})
+	}
+}
+
+func collectNewActivities(client protobuf.ChittyChatClient, name string) {
+	for {
+		//Broadcast
+		lamport++
+		response, err := client.Broadcast(context.Background(), &protobuf.BroadcastRequest{Time: lamport, LatestMessageId: latestMessageId, From: name})
+		if err != nil {
 			log.Fatalf("could not get chat list: %v", err)
 		}
-		for i := 0; i < len(response3.Activities); i++ {
-			log.Print(response3.Activities[i])
-			//if response3.Activities[i].Time > latestTimestamp {
-			//update the latest timestamp
-			//}
+		if response != nil {
+			//Compare lamport here
+			if response.Time > lamport {
+				lamport = response.Time
+			}
+			lamport++
+			for i := 0; i < len(response.Activities); i++ {
+				log.Print("(" + fmt.Sprint(lamport) + ") " + response.Activities[i].From + ": " + response.Activities[i].Message)
+				if response.Activities[i].Id > latestMessageId {
+					latestMessageId = response.Activities[i].Id
+				}
+			}
 		}
-		fmt.Println("listening again")
 		time.Sleep(time.Second)
-		//wait x seconds
 	}
 }
