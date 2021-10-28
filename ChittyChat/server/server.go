@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"time"
 
 	"Miniproject2/ChittyChat/protobuf"
 
@@ -94,7 +93,6 @@ func main() {
 	if err := s.Serve(lis); err != nil { //error while listening
 		log.Fatalf("failed to serve: %v", err)
 	}
-	time.Sleep(1000 * time.Second)
 }
 
 var arrayCount = 0
