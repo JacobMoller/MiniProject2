@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"Miniproject2/ChittyChat/protobuf"
@@ -14,7 +15,7 @@ import (
 
 var activityDB []Activity
 var participants []string
-var participantsAlive []string
+var receivedBroadcasts [300]string
 var lamport = int32(0)
 
 type Activity struct {
@@ -41,17 +42,22 @@ func (s *server) Publish(ctx context.Context, in *protobuf.PublishRequest) (*pro
 	}
 	lamport++
 	var id = int32(len(activityDB) + 1)
-	activityDB = append(activityDB, Activity{id, in.Time, in.Type, in.Message, in.From})
-	fmt.Println(in.Type)
+	var responseMessage = ""
 	if in.Type == "JOIN" {
 		participants = append(participants, in.From)
+		responseMessage = "Participant " + in.From + " joined Chitty-Chat at Lamport time " + strconv.Itoa(int(lamport))
+	} else {
+		responseMessage = "(Lamport time " + strconv.Itoa(int(lamport)) + ") " + in.From + ": " + in.Message
 	}
+	activityDB = append(activityDB, Activity{id, in.Time, in.Type, responseMessage, in.From})
 	lamport++
+	addToRecievedBroadcast(in.From)
 	return &protobuf.PublishReply{}, nil
 }
 
 func (s *server) Broadcast(ctx context.Context, in *protobuf.BroadcastRequest) (*protobuf.BroadcastReply, error) {
 	//Compare lamport here
+	addToRecievedBroadcast(in.From)
 	if in.Time > lamport {
 		lamport = in.Time
 	}
@@ -83,7 +89,7 @@ func main() {
 	}
 	s := grpc.NewServer() //we create a new server
 	protobuf.RegisterChittyChatServer(s, &server{})
-	go test()
+
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil { //error while listening
 		log.Fatalf("failed to serve: %v", err)
@@ -91,19 +97,45 @@ func main() {
 	time.Sleep(1000 * time.Second)
 }
 
-func test() {
-	for {
-		fmt.Println("du er sød")
-		time.Sleep(time.Second)
+var arrayCount = 0
+var checkForDeadCount = 0
+
+func addToRecievedBroadcast(username string) {
+	if arrayCount >= len(participants)*3 {
+		arrayCount = 0
 	}
+	receivedBroadcasts[arrayCount] = username
+	checkForDeadCount++
+	if checkForDeadCount >= len(participants)*3 {
+		CheckIfOneOrMoreIsDead()
+		checkForDeadCount = 0
+	}
+	arrayCount++
+	fmt.Print("[")
+	for i := 0; i < len(participants)*3; i++ {
+		fmt.Print(receivedBroadcasts[i] + ",")
+	}
+	fmt.Println("]")
 }
 
-/*
+var participantsAlive []string
 
-	var listOfChatMessages = []*protobuf.Course{
-		{From: "Jacob",Type:"message",Content:"Hej verden!"},
-		{From: "Jeppe",Type:"message",Content:"Yo!"},
-		{From: "Freja",Type:"message",Content:"Japan!"},
+func CheckIfOneOrMoreIsDead() {
+	participantsAlive = nil
+	for i := 0; i < len(participants); i++ {
+		var appeared bool = false
+		for j := 0; j < len(participants)*3; j++ {
+			if participants[i] == receivedBroadcasts[j] {
+				appeared = true
+			}
+		}
+		if appeared {
+			participantsAlive = append(participantsAlive, participants[i])
+		} else {
+			lamport++
+			var responseMessage = "Participant " + participants[i] + " left Chitty-Chat at Lamport time " + strconv.Itoa(int(lamport))
+			activityDB = append(activityDB, Activity{int32(len(activityDB) + 1), lamport, "LEAVE", responseMessage, participants[i]})
+		}
 	}
-
-*/
+	participants = participantsAlive
+}

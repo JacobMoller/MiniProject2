@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -67,7 +66,7 @@ func collectNewActivities(client protobuf.ChittyChatClient, name string) {
 			}
 			lamport++
 			for i := 0; i < len(response.Activities); i++ {
-				log.Print("(" + fmt.Sprint(lamport) + ") " + response.Activities[i].From + ": " + response.Activities[i].Message)
+				log.Println(response.Activities[i].Message)
 				if response.Activities[i].Id > latestMessageId {
 					latestMessageId = response.Activities[i].Id
 				}
