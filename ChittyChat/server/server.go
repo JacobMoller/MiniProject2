@@ -9,13 +9,15 @@ import (
 
 	"Miniproject2/ChittyChat/protobuf"
 
+	"sync"
+
 	"google.golang.org/grpc"
 )
 
 var activityDB []Activity
 var participants []string
 var receivedBroadcasts [300]string
-var lamport = int32(0)
+var l Lamport
 
 type Activity struct {
 	Id      int32
@@ -23,6 +25,11 @@ type Activity struct {
 	Type    string
 	Message string
 	From    string
+}
+
+type Lamport struct {
+	mu      sync.Mutex
+	lamport int32
 }
 
 type server struct {
@@ -36,20 +43,20 @@ type Message struct {
 
 func (s *server) Publish(ctx context.Context, in *protobuf.PublishRequest) (*protobuf.PublishReply, error) {
 	//Compare lamport here
-	if in.Time > lamport {
-		lamport = in.Time
+	if in.Time > l.getLamport() {
+		l.replaceLamport(in.Time)
 	}
-	lamport++
+	l.Inc()
 	var id = int32(len(activityDB) + 1)
 	var responseMessage = ""
 	if in.Type == "JOIN" {
 		participants = append(participants, in.From)
-		responseMessage = "Participant " + in.From + " joined Chitty-Chat at Lamport time " + strconv.Itoa(int(lamport))
+		responseMessage = "Participant " + in.From + " joined Chitty-Chat at Lamport time " + strconv.Itoa(int(l.getLamport()))
 	} else {
-		responseMessage = "(Lamport time " + strconv.Itoa(int(lamport)) + ") " + in.From + ": " + in.Message
+		responseMessage = "(Lamport time " + strconv.Itoa(int(l.getLamport())) + ") " + in.From + ": " + in.Message
 	}
 	activityDB = append(activityDB, Activity{id, in.Time, in.Type, responseMessage, in.From})
-	lamport++
+	l.Inc()
 	addToRecievedBroadcast(in.From)
 	return &protobuf.PublishReply{}, nil
 }
@@ -57,16 +64,16 @@ func (s *server) Publish(ctx context.Context, in *protobuf.PublishRequest) (*pro
 func (s *server) Broadcast(ctx context.Context, in *protobuf.BroadcastRequest) (*protobuf.BroadcastReply, error) {
 	//Compare lamport here
 	addToRecievedBroadcast(in.From)
-	if in.Time > lamport {
-		lamport = in.Time
+	if in.Time > l.getLamport() {
+		l.replaceLamport(in.Time)
 	}
-	lamport++
+	l.Inc()
 	var newActivities []*protobuf.Activity
 	for i := 0; i < len(activityDB); i++ {
 		activity := activityDB[i]
 		activityForProtobuf := &protobuf.Activity{
 			Id:      activity.Id,
-			Time:    lamport,
+			Time:    l.getLamport(),
 			Type:    activity.Type,
 			Message: activity.Message,
 			From:    activity.From,
@@ -75,11 +82,12 @@ func (s *server) Broadcast(ctx context.Context, in *protobuf.BroadcastRequest) (
 			newActivities = append(newActivities, activityForProtobuf)
 		}
 	}
-	lamport++
-	return &protobuf.BroadcastReply{Time: lamport, Activities: newActivities}, nil
+	l.Inc()
+	return &protobuf.BroadcastReply{Time: l.getLamport(), Activities: newActivities}, nil
 }
 
 func main() {
+	l = Lamport{}
 	//port :8080
 	lis, err := net.Listen("tcp", ":8080")
 
@@ -119,6 +127,7 @@ func addToRecievedBroadcast(username string) {
 var participantsAlive []string
 
 func CheckIfOneOrMoreIsDead() {
+
 	participantsAlive = nil
 	for i := 0; i < len(participants); i++ {
 		var appeared bool = false
@@ -130,10 +139,27 @@ func CheckIfOneOrMoreIsDead() {
 		if appeared {
 			participantsAlive = append(participantsAlive, participants[i])
 		} else {
-			lamport++
-			var responseMessage = "Participant " + participants[i] + " left Chitty-Chat at Lamport time " + strconv.Itoa(int(lamport))
-			activityDB = append(activityDB, Activity{int32(len(activityDB) + 1), lamport, "LEAVE", responseMessage, participants[i]})
+			l.Inc()
+			var responseMessage = "Participant " + participants[i] + " left Chitty-Chat at Lamport time " + strconv.Itoa(int(l.getLamport()))
+			activityDB = append(activityDB, Activity{int32(len(activityDB) + 1), l.getLamport(), "LEAVE", responseMessage, participants[i]})
 		}
 	}
 	participants = participantsAlive
+}
+
+func (l *Lamport) Inc() {
+	l.mu.Lock()
+	l.lamport++
+	l.mu.Unlock()
+}
+
+func (l *Lamport) getLamport() int32 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.lamport
+}
+func (l *Lamport) replaceLamport(newLamport int32) {
+	l.mu.Lock()
+	l.lamport = newLamport
+	defer l.mu.Unlock()
 }

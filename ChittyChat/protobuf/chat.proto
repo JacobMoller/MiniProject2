@@ -36,20 +36,3 @@ message BroadcastReply {
     int32 time = 1;
     repeated Activity activities = 2;
 }
-
-/*message Client {
-    string Name = 1;
-}*/
-
-
-
-/*
-    string from = 1;
-    enum MessageType {
-        CHAT = 0;
-        JOIN = 1;
-        LEAVE = 2;
-    }
-    MessageType type = 2;
-    string content = 3;
-*/
